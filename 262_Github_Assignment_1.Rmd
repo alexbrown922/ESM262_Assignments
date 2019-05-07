@@ -83,18 +83,11 @@ sum(as.numeric(Agg_Preserve$Acreage))
 3. What is the mean net assessed value per acre of the entire county?
 i.e., as if the entire county were a single parcel.
 ```{r}
+Mean_AV <- parcels %>% 
+  summarize(mean = (sum(Net_AV, na.rm = TRUE)/sum(Acreage)))
 
-Mean_AV <- parcels %>%
-  mutate(AVPerAcre = Net_AV/Acreage) %>% 
-  select(AVPerAcre) %>% 
-  filter(AVPerAcre != "Inf") %>% 
-  filter(AVPerAcre != "NaN")
+Mean_AV
 
-  #mutate(Net_AV = as.numeric(Net_AV)) %>% 
-  #mutate(Acreage = as.numeric(Acreage)) %>% 
-#mutate(AVPerAcre = as.numeric(AVPerAcre))
-
-summarise()
 ```
 
 4. What is the total net assessed value of all non-taxable parcels?
