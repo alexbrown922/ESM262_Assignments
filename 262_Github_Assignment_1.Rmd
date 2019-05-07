@@ -1,0 +1,137 @@
+---
+title: "262_Github_Assignement_1"
+author: "Alex Brown"
+date: "5/7/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#load packages
+library(tidyverse)
+library(dplyr)
+```
+
+1. Read the parcels data as-is (all columns; no automatic type conversion) into a parcels_raw tibble.
+```{r}
+
+parcels_raw <- read_csv("Santa_Barbara_County_parcels_2011.csv", col_types = cols(.default = col_character()))
+
+parcels_raw
+```
+2. Copy only the following columns into a parcels tibble
+
+3. Convert the parcels columns to the appropriate type. Convert any placeholders for unknown data to NA.
+```{r}
+parcels <- transmute(parcels_raw,
+    APN,
+    Situs1,
+    Situs2,
+    Acreage = parse_double(parcels_raw$Acreage),
+    UseCode,
+    NonTaxCode,
+    AgPres,
+    LandValue = parse_double(parcels_raw$LandValue),
+    Net_Impr = parse_double(parcels_raw$Net_Impr),
+    Net_AV = parse_double(parcels_raw$Net_AV),
+    M_Address1,
+    M_Address2)
+
+parcels
+```
+
+4. Write the parcels tibble to a CSV file (using "|" as a delimiter).
+```{r}
+wrote_parcels <- write_delim(parcels,
+  "parcels.csv",
+  delim = "|",
+  na = ""
+)
+
+wrote_parcels
+```
+
+##Analyze
+
+1. What are the 10 most-frequently-occuring land uses (in descending order)?
+```{r}
+Frequent_LandUse <- parcels_raw %>%
+  count(LandUse) %>% 
+  arrange(-n) %>% 
+  head(10)
+  
+Frequent_LandUse
+
+```
+
+2. How many acres are in agricultural preserves?
+Assume agricultural preserves are indicated by non-NA values for AgPres.
+```{r}
+Agg_Preserve <- parcels %>%
+  select(Acreage, AgPres) %>% 
+  filter(AgPres != "NA")
+  
+Agg_Preserve
+
+sum(as.numeric(Agg_Preserve$Acreage)) 
+# adds the values in acreage column in df with just agriculutral preserves
+```
+
+3. What is the mean net assessed value per acre of the entire county?
+i.e., as if the entire county were a single parcel.
+```{r}
+
+Mean_AV <- parcels %>%
+  mutate(AVPerAcre = Net_AV/Acreage) %>% 
+  select(AVPerAcre) %>% 
+  filter(AVPerAcre != "Inf") %>% 
+  filter(AVPerAcre != "NaN")
+
+  #mutate(Net_AV = as.numeric(Net_AV)) %>% 
+  #mutate(Acreage = as.numeric(Acreage)) %>% 
+#mutate(AVPerAcre = as.numeric(AVPerAcre))
+
+summarise()
+```
+
+4. What is the total net assessed value of all non-taxable parcels?
+Assume non-taxable parcels are indicated by non-NA values for NonTaxCode.
+```{r}
+AV_NonTax <- parcels %>%
+  select(Net_AV, NonTaxCode) %>% 
+  filter(NonTaxCode != "NA")
+
+AV_NonTax
+
+sum(as.numeric(AV_NonTax$Net_AV))
+# adds the values in net assessed value column in df with just non-taxable parcels
+```
+
+5. What are the 10 largest property holders, by acreage?
+Use the complete mailing address for tax statements as a proxy for the parcel owner. Ignore parcels where either component of the address is NA.
+```{r}
+
+LargestProp_Acreage <- parcels %>% 
+  select(Acreage, M_Address1, M_Address2) %>% 
+  filter(Acreage != "NA", M_Address1 != "NA", M_Address2 != "NA") %>% 
+  arrange(desc(Acreage)) %>%
+  slice(1:10) 
+  
+LargestProp_Acreage
+```
+
+6. What are the 10 largest property holders, by net assessed value?
+```{r}
+LargestProp_AV <- parcels %>% 
+  select(Net_AV, M_Address1, M_Address2) %>% 
+  filter(Net_AV != "NA", M_Address1 != "NA", M_Address2 != "NA") %>%
+  arrange(desc(Net_AV)) %>%
+  slice(1:10)
+
+LargestProp_AV
+```
+
+
