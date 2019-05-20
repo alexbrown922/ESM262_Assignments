@@ -1,7 +1,7 @@
 ---
-title: "ESM_262_Assignment2"
+title: "Assignment 2"
 author: "Alex Brown"
-date: "5/17/2019"
+date: "5/20/2019"
 output: html_document
 ---
 
@@ -9,10 +9,11 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
-#load packages
+```{r, messages=FALSE}
+#install packages
 library(tidyverse)
-library(dplyr)
+library(RSQLite)
+library(DBI)
 ```
 
 1. Read the parcels data as-is (all columns; no automatic type conversion) into a parcels_raw tibble.
@@ -28,10 +29,10 @@ parcels_raw
 
 # read in UseCodes and Santa Barbara County parcels (2011) csv's. Removed NA values with col_types command.
 ```
-2. Copy only the following columns into a parcels tibble
 
-3. Convert the parcels columns to the appropriate type. Convert any placeholders for unknown data to NA.
+## Import and Tidy
 ```{r}
+
 parcels <- transmute(parcels_raw,
     APN,
     Situs1,
@@ -45,33 +46,50 @@ parcels <- transmute(parcels_raw,
     Net_AV = parse_double(parcels_raw$Net_AV),
     M_Address1,
     M_Address2)
+  
+wrote_parcels <- write_delim(parcels,
+  "parcels.csv",
+  delim = "|",
+  na = ""
+)
 
-parcels
+wrote_parcels
 
-#Selected only the *following columns* into a parcels tibble. Converted integer columns to parse_double. NA's removed when reading in csv's.
+# Combining UseCode and Parcels
+UseCodeParcels <- parcels %>%
+  left_join(UseCode, by = "UseCode")
 ```
 
-4. Create a connection to a new parcels.db SQLite database. Copy the parcels tibble into the parcels.db database.
 ```{r}
 
+con <- dbConnect(RSQLite::SQLite(), dbname = "parcels.sqlite")
+#create and connect to a sqlite database
+
+dbWriteTable(con, "parcels", parcels, overwrite=TRUE)
+#wrote the parcels dataframe into the database
+
+dbWriteTable(con, "usecodes", UseCode, overwrite=TRUE)
+#wrote the usecodes_raw dataframe into the database
+
+dbWriteTable(con, "UseCode_Parcels", UseCodeParcels, overwrite=TRUE)
+#wrote the combo dataframe into the database 
+
+dbListTables(con)
+#check the tables within the database.
 ```
 
-##Analyze
+## Analyze 
 
 1. What are the 10 most-frequently-occuring land uses (in descending order)?
-```{r}
-merged_parcels <- wrote_parcels %>% #merged the UseCode csv with the parcels tibble
-left_join(UseCode, by = "UseCode")
 
-
-Frequent_LandUse <- merged_parcels %>% 
-  count(CodeDesc) %>% 
-  arrange(-n) %>% 
-  head(10)
-  
-Frequent_LandUse
-
-#counted CodeDesc and arranged in descending order, only presenting the top 10
+```{sql connection=con}
+SELECT DISTINCT UseCode, 
+CodeDesc AS "Land Use", 
+count(*) AS "COUNT"
+FROM UseCode_Parcels
+GROUP BY  UseCode
+ORDER BY "COUNT" DESC
+LIMIT 10;
 ```
 1. Single Family Residence: 73,915
 2. Residential Rentals: 4,985
@@ -84,97 +102,66 @@ Frequent_LandUse
 9. Planned Unit Development: 1,124
 10. Retail Stores, Single Story: 1,024
 
-2. How many acres are in agricultural preserves?
-Assume agricultural preserves are indicated by non-NA values for AgPres.
-```{r}
-Agg_Preserve <- parcels %>%
-  select(Acreage, AgPres) %>% 
-  filter(AgPres != "NA") #filters out "NA" ag pres values
-  
-Agg_Preserve
+2. How many acres are in agricultural preserves? Assume agricultural preserves are indicated by non-NA values for AgPres.
 
-sum(as.numeric(Agg_Preserve$Acreage)) 
-# adds the values in acreage column in df with just agriculutral preserves
+```{sql connection=con}
+SELECT ROUND(SUM(Acreage),2) 
+AS "AG. Preserve Acreage"
+FROM UseCode_Parcels
+WHERE AgPres IS NOT NULL;
 ```
-549563.4 acres on agricultural preserves 
-
+549563.4 acres on agricultural preserves
 
 3. What is the mean net assessed value per acre of the entire county?
 i.e., as if the entire county were a single parcel.
-```{r}
-Mean_AV <- parcels %>% 
-  summarize(mean = (sum(Net_AV, na.rm = TRUE)/sum(Acreage)))
 
-Mean_AV
-
-#takes the mean of the sum of Net_AV/sum of Acreage
+```{sql connection=con}
+SELECT ROUND(SUM(Net_AV)/SUM(Acreage),3) AS "Mean Net Assessed Value/Acre"
+FROM UseCode_Parcels
+WHERE Acreage>0
+AND Net_AV>0;
 ```
-34202.63 mean net assessed value per acre for entire county.
+$60,833.24 mean net assessed value per acre for entire county.
+#different value than assignment 1 taking out negative NET AV values this time
 
 4. What is the total net assessed value of all non-taxable parcels?
 Assume non-taxable parcels are indicated by non-NA values for NonTaxCode.
-```{r}
-AV_NonTax <- parcels %>%
-  select(Net_AV, NonTaxCode) %>% 
-  filter(NonTaxCode != "NA")
 
-AV_NonTax
-
-sum(as.numeric(AV_NonTax$Net_AV))
-# adds the values in net assessed value column in df with just non-taxable parcels
+```{sql connection=con}
+SELECT SUM(Net_AV) AS "Total net assessed value of all non-taxable parcels"
+FROM UseCode_Parcels
+WHERE NonTaxCode IS NOT NULL;
 ```
 1,093,026,091 total net assessed value of all non-taxable parcels
 
-5. What are the 10 largest property holders, by acreage?
-Use the complete mailing address for tax statements as a proxy for the parcel owner. Ignore parcels where either component of the address is NA.
-```{r}
+5. What are the 10 largest property holders, by acreage? Use the complete mailing address for tax statements as a proxy for the parcel owner. Ignore parcels where either component of the address is NA.
 
-LargestProp_Acreage <- parcels %>% 
-  select(Acreage, M_Address1, M_Address2) %>% 
-  filter(Acreage != "NA", M_Address1 != "NA", M_Address2 != "NA") %>% 
-  arrange(desc(Acreage)) %>%
-  head(10)
-  
-LargestProp_Acreage
-
-#selected appropriate columns.
-#filter out "NA"
-#arrange in descending order and include only top 10
+```{sql connection=con}
+SELECT M_Address1,M_Address2, SUM(Acreage) AS "Total Acreage"
+FROM parcels
+LEFT JOIN usecodes ON parcels.UseCode = usecodes.UseCode
+WHERE M_Address1 IS NOT NULL
+AND M_Address2 IS NOT NULL
+GROUP BY M_Address1, M_Address2
+ORDER BY "Total Acreage" DESC
+LIMIT 10;
 ```
-1. 25,660.00 - 785 MARKET ST, SAN FRANCISCO CA 94103
-2. 16,640.00 - 201 MISSION ST, 4TH FLR SAN FRANCISCO CA 94105 1831
-3. 10,517.47 - 166 PARADISE RD, SANTA BARBARA CA 93105
-4. 10,036.00 - 166 PARADISE RD, SANTA BARBARA CA 93105
-5. 9,438.00 - 785 MARKET ST, SAN FRANCISCO CA 94103
-6. 6,358.00 - 870 MARKET ST.SUITE 1100, SAN FRANCISCO CA 94102
-7. 6,263.49 - 600 HARRISON ST #600, SAN FRANCISCO CA 94107 1372
-8. 6,174.00 - 2491 BULL CANYON RD, SANTA MARIA CA 93454
-9. 6,080.00 - 870 MARKET ST 1100, SAN FRANCISCO CA 94102
-10. 5,785.75 - 650 ALAMO PINTADO, 203 SOLVANG CA 93463
+these slightly different than assignment 1
 
 6. What are the 10 largest property holders, by net assessed value?
-```{r}
-LargestProp_AV <- parcels %>% 
-  select(Net_AV, M_Address1, M_Address2) %>% 
-  filter(Net_AV != "NA", M_Address1 != "NA", M_Address2 != "NA") %>%
-  arrange(desc(Net_AV)) %>%
-  head(10)
 
-LargestProp_AV
-
-#selected appropriate columns.
-#filter out "NA"
-#arrange in descending order and include only top 10
+```{sql connection=con}
+SELECT 
+M_Address1 AS "Address 1",
+M_Address2 AS "Address 2", 
+SUM(Net_AV) AS "Total Value"
+FROM parcels
+LEFT JOIN usecodes ON parcels.UseCode = usecodes.UseCode
+WHERE M_Address1 IS NOT NULL
+AND M_Address2 IS NOT NULL
+AND Net_AV > 0
+GROUP BY M_Address1, M_Address2
+ORDER BY "Total Value" DESC
+LIMIT 10;
 ```
-
-1. $242,575,885 - 737 GARDEN ST, SANTA BARBARA CA 93101
-2. $130,917,962 - 280 CHESTNUT, WESTMONT IL 60559
-3. $124,353,106 - 735 ANACAPA ST, SANTA BARBARA CA 93101
-4. $116,311,340 - 1260 CHANNEL DR, SANTA BARBARA CA 93105
-5. $108,600,000 - 645 FIFTH AVE 8, NEW YORK NY 10022
-6. $107,926,369 - 500 STEVENS AVE 100, SOLANA BEACH CA 92075
-7. $88,323,699 - PO BX 340, RAMSEY NJ 07446
-8. $85,751,872 - 110 N CARPENTER ST, CHICAGO IL 60607
-9. $82,206,252 - 633 E CABRILLO BLVD, SANTA BARBARA CA 93103
-10. $75,963,032 - 1112 SANTA BARBARA ST, SANTA BARBARA CA 93101
-
+these slightly different than assignment 1
