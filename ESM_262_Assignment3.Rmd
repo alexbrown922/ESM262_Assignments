@@ -1,0 +1,55 @@
+---
+title: "ESM_Assignment3"
+author: "Alex Brown"
+date: "5/23/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+```
+
+#Mean Speed of 100 km/hr
+```{r}
+source("autopower.R")
+
+# creating sample speeds
+
+nsample = 100
+speeds = rnorm(mean=27, sd=2.7, n=nsample)
+
+#creates a new df with each model occurence 
+
+sampleresults100 = data.frame(speed=speeds, power=NA)
+sampleresults100$power = autopower(V=speeds, A=25, m=20000)
+
+# results
+ggplot(sampleresults100, aes(speed, power/1000))+geom_point()+labs(x="speed (m/s)", y="power (kW)")
+
+# mean
+mean(sampleresults100$power)
+```
+
+#Mean Speed of 80 km/hr
+```{r}
+source("autopower.R")
+
+# creating sample speeds
+
+nsample = 100
+speeds = rnorm(mean=24, sd=2.4, n=nsample)
+
+#creates a new df with each model occurence 
+sampleresults80 = data.frame(speed=speeds, power=NA)
+sampleresults80$power = autopower(V=speeds, A=25, m=20000)
+
+# results
+ggplot(sampleresults80, aes(speed, power/1000))+geom_point()+labs(x="speed (m/s)", y="power (kW)")
+
+# mean
+mean(sampleresults80$power)
+```
