@@ -1,19 +1,19 @@
 #' Moorea, French Polynesia: Fish Caught and Revenue 
-#' @param catch_location_data  data frame with side of island where fish species were caught and number of fish caught
+#' @param catch_sides_data  data frame with side of island where fish species were caught and number of fish caught
 #' @param price_data data frame with price of fish and number of fish caught
 #' @param graph graph of revenue in each location
 #' @param total_revenue total revenue
 #' @return list with total revenue at each side of the island, most frequently caught species at each side, total revenue at each side of the island, and total revenue 
 
 
-fish_summary = function(catch_location_data, price_data, graph=FALSE) {
+fish_summary = function(catch_sides_data, price_data, graph=FALSE) {
   
   
   ## revenue on each side of island 
   
   if(any(price_data$price < 0)) stop('prevents negative price')
   
-  revenues_sideofisland <- left_join(catch_location_data, price_data, by = "fish") %>%
+  revenues_sideofisland <- left_join(catch_sides_data, price_data, by = "fish") %>%
     mutate(west_rev = west*price) %>% 
     mutate(north_rev = north*price) %>%
     mutate(east_rev = east*price)
@@ -27,9 +27,9 @@ fish_summary = function(catch_location_data, price_data, graph=FALSE) {
   
   ## most fish caught on each side of island
   
-  fish_west <- rep(catch_location_data$fish, catch_location_data$west)
-  fish_north <- rep(catch_location_data$fish, catch_location_data$north)
-  fish_east <- rep(catch_location_data$fish, catch_location_data$east)
+  fish_west <- rep(catch_sides_data$fish, catch_sides_data$west)
+  fish_north <- rep(catch_sides_data$fish, catch_sides_data$north)
+  fish_east <- rep(catch_sides_data$fish, catch_sides_data$east)
   
   fish_west <- as.factor(fish_west)
   fish-north <- as.factor(fish_north)
@@ -44,7 +44,7 @@ fish_summary = function(catch_location_data, price_data, graph=FALSE) {
   
   ## total revenue in each fishery   
   
-  total_revenues_by_fishery <- left_join(catch_location_data, price_data, by = "fish") %>%
+  total_revenues_by_fishery <- left_join(catch_sides_data, price_data, by = "fish") %>%
     mutate(totalfish = rowSums(.[2:4])) %>%
     mutate(fishrev = totalfish*price) %>%
     select("fish", "fishrev") %>%
