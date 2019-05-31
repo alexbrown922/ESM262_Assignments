@@ -1,0 +1,85 @@
+---
+title: "ESM262_Assignment4"
+author: "Alex Brown"
+date: "5/31/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(magrittr)
+```
+
+###Test data
+
+###Price Data
+```{r}
+
+price_data <- c("6000","375", "500", "200", "600") %>%
+ as.tibble %>%
+ mutate(fish = c("cod", "halibut", "shark", "rockfish","swordfish")) %>%
+  magrittr::set_colnames(value = c("price", "fish")) %>%
+ mutate(price = parse_double(price, na = "0"))
+
+```
+
+###Fish Caught
+```{r}
+
+## vector of fish
+
+possible.fish = c("cod","halibut","shark","rockfish","swordfish")
+
+## westside fish
+
+fish_west <- sample(possible.fish, size=20, replace=T) %>%
+ as_tibble %>%
+ group_by(value) %>%
+ count() %>%
+ magrittr::set_colnames(value = c("fish", "caughtwest"))
+
+## northside fish
+
+fish_north <- sample(possible.fish, size=20, replace=T) %>%
+ as_tibble %>%
+ group_by(value) %>%
+ count() %>%
+
+ magrittr::set_colnames(value = c("fish", "caughtnorth"))
+
+## eastside fish
+
+fish_east <- sample(possible.fish, size=20, replace=T) %>%
+ as_tibble %>%
+ group_by(value) %>%
+ count() %>%
+ magrittr::set_colnames(value = c("fish", "caughteast"))
+
+## all fish
+
+fish_all <- left_join(fish_north, fish_east, by= "fish")
+
+catch_sides_data <- left_join(fish_all, fish_west, by= "fish") %>%
+ as.tibble()
+
+as.numeric(catch_sides_data$caughtnorth)
+
+## remove possible NA's
+
+catch_sides_data[is.na(catch_sides_data)] <- 0
+```
+
+### Function
+
+```{r source}
+
+source("/Users/ianbrown/Documents/Bren/Spring 2019/ESM 262/Github Assignment 4/ESM262_Assignments/fish_calcs.R")
+
+summary <- fish_summary(catch_sides_data = catch_sides_data, price_data = price_data, graph = TRUE)
+
+summary
+```
