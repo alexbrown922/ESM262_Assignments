@@ -1,4 +1,4 @@
-#' Moorea, French Polynesia: Fish Caught and Revenue 
+#' Fish Caught and Revenue 
 #' @param catch_sides_data  data frame with side of island where fish species were caught and number of fish caught
 #' @param price_data data frame with price of fish and number of fish caught
 #' @param graph graph of revenue in each location
